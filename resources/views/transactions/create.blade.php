@@ -41,12 +41,12 @@
                 <!-- Amount -->
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Amount (Rp)</label>
-                    <input type="number" name="amount" required
-                           class="w-full px-4 py-4 rounded-2xl border border-gray-300 dark:border-gray-600 
-                                  bg-white dark:bg-gray-800 
-                                  text-gray-900 dark:text-white 
-                                  placeholder-gray-400 dark:placeholder-gray-500 text-2xl focus:ring-2 focus:ring-blue-500"
-                           placeholder="0">
+                    <input type="text" name="amount" required
+                        class="w-full px-4 py-4 rounded-2xl border border-gray-300 dark:border-gray-600 
+                                bg-white dark:bg-gray-800 
+                                text-gray-900 dark:text-white text-2xl focus:ring-2 focus:ring-blue-500"
+                        placeholder="0"
+                        onkeyup="this.value = this.value.replace(/[^0-9.]/g, '')">
                 </div>
 
                 <!-- Description -->

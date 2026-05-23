@@ -16,7 +16,7 @@ class TransactionController extends Controller
         $currentMonth = Carbon::now()->month;
         $currentYear = Carbon::now()->year;
 
-        // === Dashboard Data ===
+        // Dashboard Summary Data
         $totalIncome = Transaction::where('user_id', $user->id)
             ->where('type', 'income')
             ->whereMonth('transaction_date', $currentMonth)
@@ -38,7 +38,7 @@ class TransactionController extends Controller
             ->take(10)
             ->get();
 
-        // === All Transactions for Index Page ===
+        // All Transactions for Index Page
         $allTransactions = Transaction::with('category')
             ->where('user_id', $user->id)
             ->orderBy('transaction_date', 'desc')
@@ -47,46 +47,91 @@ class TransactionController extends Controller
 
         $categories = Category::where('user_id', $user->id)->get();
 
-        // Check if user is accessing /transactions or /dashboard
+        // Monthly Trend Data (Last 6 months)
+        $monthlyData = [];
+        $currentDate = Carbon::now();
+
+        for ($i = 5; $i >= 0; $i--) {
+            $month = $currentDate->copy()->subMonths($i);
+            
+            $income = Transaction::where('user_id', $user->id)
+                ->where('type', 'income')
+                ->whereMonth('transaction_date', $month->month)
+                ->whereYear('transaction_date', $month->year)
+                ->sum('amount');
+
+            $expense = Transaction::where('user_id', $user->id)
+                ->where('type', 'expense')
+                ->whereMonth('transaction_date', $month->month)
+                ->whereYear('transaction_date', $month->year)
+                ->sum('amount');
+
+            $monthlyData[] = [
+                'month' => $month->format('M'),
+                'income' => $income,
+                'expense' => $expense,
+            ];
+        }
+
+        // Check route
         if (request()->routeIs('transactions.index')) {
             return view('transactions.index', compact('allTransactions', 'categories'));
         }
 
-        
-        // Default: Dashboard
+        // Dashboard
         return view('dashboard', compact(
             'totalIncome',
             'totalExpense',
             'balance',
-            'recentTransactions'
+            'recentTransactions',
+            'monthlyData'
         ));
     }
-           public function create()
+
+    public function create()
     {
         $categories = Category::where('user_id', Auth::id())->get();
-        
         return view('transactions.create', compact('categories'));
     }
 
-            public function store(Request $request)
+        public function store(Request $request)
     {
+        // 1. Sanitize periods/commas out of the amount BEFORE validating
+        if ($request->has('amount')) {
+            $cleanAmount = str_replace(['.', ','], '', $request->amount);
+            $request->merge(['amount' => $cleanAmount]);
+        }
+
+        // 2. Run your validation on the clean integer string
         $request->validate([
-            'type'              => 'required|in:income,expense',
-            'amount'            => 'required|numeric|min:100',
-            'description'       => 'required|string|max:255',
-            'transaction_date'  => 'required|date',
+            'type'             => 'required|in:income,expense',
+            'amount'           => 'required|numeric|min:100',
+            'description'      => 'required|string|max:255',
+            'transaction_date' => 'required|date',
         ]);
 
+        // 3. Create the entry safely
         Transaction::create([
             'user_id'          => Auth::id(),
             'type'             => $request->type,
-            'category_id'      => null,           // No category
-            'amount'           => $request->amount,
+            'category_id'      => null,
+            'amount'           => $request->amount, // Already cleaned up above
             'description'      => $request->description,
             'transaction_date' => $request->transaction_date,
         ]);
 
         return redirect()->route('dashboard')
-                         ->with('success', '✅ Transaction saved successfully!');
+                        ->with('success', '✅ Transaction saved successfully!');
+    }
+    public function destroy(Transaction $transaction)
+    {
+        if ($transaction->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $transaction->delete();
+
+        return redirect()->route('dashboard')
+                         ->with('success', 'Transaction deleted successfully!');
     }
 }
